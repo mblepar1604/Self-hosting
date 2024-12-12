@@ -13,19 +13,32 @@ Vagrant.configure("2") do |config|
     sudo apt update -y
 
     # Instalamos apache y curl
-    sudo apt-get install -y apache2 curl cron
+    sudo apt-get install -y apache2 curl cron certbot python3-certbot-apache
 
     # Habilitamos el inicio automático de apache y de cron
     sudo systemctl enable apache2
     sudo systemctl enable cron
 
+    # Copiamos los archivos del sitio web a la máquina virtual
+    sudo cp -r /vagrant/mblesapardo.es/* /var/www/html/
+    sudo cp /vagrant/mblesapardo.es/apache2.conf /etc/apache2/sites-available/000-default.conf
+    sudo cp /vagrant/mblesapardo.es/apache2-https.conf /etc/apache2/sites-available/default-ssl.conf
+
+    # Asignamos los permisos adecuados
+    sudo chown -R www-data:www-data /var/www/html/
+    sudo chmod -R 755 /var/www/html/
+
+    # Ejecutamos certbot para obtener los certificados
+    sudo certbot --apache -d mblesapardo.es -d www.mblesapardo.es --email mblesapardo1@gmail.com --agree-tos --no-eff-email
+
+    # Habilitamos SSL en Apache
+    sudo a2enmod ssl
+    sudo a2ensite default-ssl.conf
+        
+    # Reiniciamos Apache para aplicar los cambios
+    sudo systemctl restart apache2
+
   SHELL
-
-  config.vm.provision "shell", inline: <<-SHELL
-
-  sudo apt install certbot python3-certbot-apache
-  sudo certbot --apache -d mblesapardo.es -d www.mblesapardo.es
-
-  SHELL
+  
 
 end

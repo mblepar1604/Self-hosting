@@ -115,16 +115,170 @@ Para redirigir los puertos en nuestro router (en este caso de Movistar) tendremo
 ## Configuración del Servidor Web de apache
 Ahora que ya tenemos todo configurado, sólo nos queda configurar el servidor web. Para ello, realizaremos los siguientes pasos:
 
-1. Configuraremos HTTPS con Let's Encrypt, esto requiere instalar **Cerbot**. Así que crearemos una nueva provisión en el archivo Vagrant.
-2. Necesitamos obtener el certificado SSL para nuestro dominio. La provisión debería quedar tal que así:
+1. Crearemos la carpeta mblesapardo.es en local, para añadir todos los archivos necesarios para la configuración del sitio web, teniendo una estructura tal que:
 
 ```
 
-config.vm.provision "shell", inline: <<-SHELL
+/mis_archivos_vagrant/
+├── sitio_web/
+│   ├── index.html
+│   ├── 404.html
+│   ├── logs/
+│   └── apache2.conf
 
-  sudo apt install certbot python3-certbot-apache
-  sudo certbot --apache -d mblesapardo.es -d www.mblesapardo.es
+```
 
-SHELL
+- El index quedará tal que así:
+
+```
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido a mblesapardo.es</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            padding: 50px;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        p {
+            font-size: 18px;
+            margin-top: 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 60%;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>¡Bienvenido a mblesapardo.es!</h1>
+        <p>Este es el sitio web que estás sirviendo con Nginx. ¡Todo está funcionando correctamente!</p>
+        <p>Si llegaste hasta aquí, significa que tu servidor web está configurado correctamente.</p>
+    </div>
+
+</body>
+</html>
+
+
+```
+
+- La página de errores:
+
+```
+
+<!-- 404.html -->
+<html>
+<head>
+    <title>404 - Página no encontrada</title>
+</head>
+<body>
+    <h1>404 - Página no encontrada</h1>
+    <p>Lo sentimos, no pudimos encontrar la página que buscas.</p>
+</body>
+</html>
+
+```
+
+- La configuración de apache.conf:
+
+```
+
+<VirtualHost *:80>
+    DocumentRoot /var/www/html
+    ServerName mblesapardo.es
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    # Páginas de error personalizadas
+    ErrorDocument 404 /404.html
+</VirtualHost>
+
+```
+
+- La provisión debería quedar con las siguientes líneas añadidas:
+
+```
+
+# Copiamos los archivos del sitio web a la máquina virtual
+sudo cp -r /vagrant/mblesapardo.es/* /var/www/html/
+sudo cp /vagrant/mblesapardo.es/apache2.conf /etc/apache2/sites-available/000-default.conf
+
+# Asignamos los permisos adecuados
+sudo chown -R www-data:www-data /var/www/html/
+sudo chmod -R 755 /var/www/html/
+
+```
+
+2. Ahora vamos a generar los certificados SSL con Let's Encrypt. Para ello necesitaremos instalar **certbot**
+
+3. Configuramos apache para que escuche los puertos 80 y 8443. Para ello ejecutaremos en la máquina y añadiremos:
+
+```
+
+sudo nano /etc/apache2/ports.conf
+
+# Se añadirá al archivo
+Listen 80
+Listen 8443
+
+```
+
+- Añadimos el puerto 8443 al archivo de configuración de ssl:
+
+```
+
+<VirtualHost *:80>
+    DocumentRoot /var/www/html
+    ServerName mblesapardo.es
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    # Página de error personalizada
+    ErrorDocument 404 /404.html
+</VirtualHost>
+
+<Directory /var/www/html/.well-known>
+    AllowOverride None
+    Options None
+    Require all granted
+</Directory>
+
+```
+
+- Habilitamos el sitio SSL en Apache y actualizamos la provision, quedando así:
+
+```
+
+# Copiamos los archivos del sitio web a la máquina virtual
+sudo cp -r /vagrant/mblesapardo.es/* /var/www/html/
+sudo cp /vagrant/mblesapardo.es/apache2.conf /etc/apache2/sites-available/000-default.conf
+sudo cp /vagrant/mblesapardo.es/apache2-https.conf /etc/apache2/sites-available/default-ssl.conf
+
+# Asignamos los permisos adecuados
+sudo chown -R www-data:www-data /var/www/html/
+sudo chmod -R 755 /var/www/html/
+
+# Habilitamos SSL en Apache
+sudo a2enmod ssl
+sudo a2ensite default-ssl.conf
+
+        
+# Reiniciamos Apache para aplicar los cambios
+sudo systemctl restart apache2
 
 ```
