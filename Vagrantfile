@@ -28,6 +28,10 @@ Vagrant.configure("2") do |config|
     sudo chown -R www-data:www-data /var/www/html/
     sudo chmod -R 755 /var/www/html/
 
+    # Creamos el archivo .htpasswd y agregamos los usuarios con las contraseñas
+    sudo htpasswd -b -c /etc/apache2/.htpasswd admin asir
+    sudo htpasswd -b /etc/apache2/.htpasswd sysadmin risa
+
     # Ejecutamos certbot para obtener los certificados
     sudo certbot --apache -d mblesapardo.es -d www.mblesapardo.es --email mblesapardo1@gmail.com --agree-tos --no-eff-email
 

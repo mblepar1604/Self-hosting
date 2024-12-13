@@ -7,7 +7,7 @@ Para esta práctica se ha decidido comprar el dominio **mblesapardo.es** en **IO
 ## Estructura inicial de la máquina virtual
 1. Utilizando **vagrant** crearemos la máquina virtual con una estructura parecida a esta y **creando un archivo _provision.sh_** para las provision:
 
-```
+```cs
 
 Vagrant.configure("2") do |config|
   config.vm.box = "debian/bookworm64"
@@ -26,9 +26,9 @@ end
 
 ```
 
-2. Instalamos **cron**, **curl** y **apache** mediante la provision, quedando así:
+2. Instalamos **cron**, **curl**, **apache2 utils** y **apache** mediante la provision, quedando así:
 
-```
+```cs
 
 config.vm.provision "shell", inline: <<-SHELL
 
@@ -36,7 +36,7 @@ config.vm.provision "shell", inline: <<-SHELL
     sudo apt update -y
 
     # Instalamos apache y curl
-    sudo apt-get install -y apache2 curl cron
+    sudo apt-get install -y apache2 apache2-utils curl cron
 
     # Habilitamos el inicio automático de apache y de cron
     sudo systemctl enable apache2
@@ -62,7 +62,7 @@ Si todo ha salido bien veremos lo siguiente:
 
 - Ahora entraremos **en la máquina Debian** y ejecutaremos el siguiente comando:
 
-```
+```cs
 
 curl -X 'POST' \
   'https://api.hosting.ionos.com/dns/v1/dyndns' \
@@ -82,7 +82,7 @@ curl -X 'POST' \
 
 - Si todo ha salido bien, deberíamos tener una respuesta como esta:
 
-```
+```cs
 
 {"bulkId":"e7ed93cd-b528-4a3e-8f55-139b4eecd3d1",
 "updateUrl":"https://ipv4.api.hosting.ionos.com/dns/v1/dyndns?q=NWI0NzRlZjdkMjEyNDlhMzg3Y2IzODM2NTY0OGYwYjguM3RJUmFfOE9JQVNJX0NxdXgzN0IzR1I2dWxjd2ZaWW9DT0ltNURSd1BrM281Tld4Q3phSHJPakRpTUx2RDlKM0hGbDktV29XcDdJNnhScFVYTjJkM0E",
@@ -93,7 +93,7 @@ curl -X 'POST' \
 
 - Seguido de esto, procederemos a abrir el contrab de nuestro servidor con el comando _contrab -e_ y agregaremos la siguiente línea:
 
-```
+```cs
 
 */5 * * * * curl "https://ipv4.api.hosting.ionos.com/dns/v1/dyndns?q=NWI0NzRlZjdkMjEyNDlhMzg3Y2IzODM2NTY0OGYwYjguM3RJUmFfOE9JQVNJX0NxdXgzN0IzR1I2dWxjd2ZaWW9DT0ltNURSd1BrM281Tld4Q3phSHJPakRpTUx2RDlKM0hGbDktV29XcDdJNnhScFVYTjJkM0E"
 
@@ -130,7 +130,7 @@ Ahora que ya tenemos todo configurado, sólo nos queda configurar el servidor we
 
 - El index quedará tal que así:
 
-```
+```html
 
 <!DOCTYPE html>
 <html lang="es">
@@ -179,7 +179,7 @@ Ahora que ya tenemos todo configurado, sólo nos queda configurar el servidor we
 
 - La página de errores:
 
-```
+```html
 
 <!-- 404.html -->
 <html>
@@ -196,7 +196,7 @@ Ahora que ya tenemos todo configurado, sólo nos queda configurar el servidor we
 
 - La configuración de apache.conf:
 
-```
+```html
 
 <VirtualHost *:80>
     DocumentRoot /var/www/html
@@ -212,7 +212,7 @@ Ahora que ya tenemos todo configurado, sólo nos queda configurar el servidor we
 
 - La provisión debería quedar con las siguientes líneas añadidas:
 
-```
+```python
 
 # Copiamos los archivos del sitio web a la máquina virtual
 sudo cp -r /vagrant/mblesapardo.es/* /var/www/html/
@@ -228,7 +228,7 @@ sudo chmod -R 755 /var/www/html/
 
 3. Configuramos apache para que escuche los puertos 80 y 8443. Para ello ejecutaremos en la máquina y añadiremos:
 
-```
+```cs
 
 sudo nano /etc/apache2/ports.conf
 
@@ -240,7 +240,7 @@ Listen 8443
 
 - Añadimos el puerto 8443 al archivo de configuración de ssl:
 
-```
+```cs
 
 <VirtualHost *:80>
     DocumentRoot /var/www/html
@@ -262,7 +262,7 @@ Listen 8443
 
 - Habilitamos el sitio SSL en Apache y actualizamos la provision, quedando así:
 
-```
+```python
 
 # Copiamos los archivos del sitio web a la máquina virtual
 sudo cp -r /vagrant/mblesapardo.es/* /var/www/html/
@@ -273,6 +273,9 @@ sudo cp /vagrant/mblesapardo.es/apache2-https.conf /etc/apache2/sites-available/
 sudo chown -R www-data:www-data /var/www/html/
 sudo chmod -R 755 /var/www/html/
 
+# Ejecutamos certbot para obtener los certificados
+sudo certbot --apache -d mblesapardo.es -d www.mblesapardo.es --email mblesapardo1@gmail.com --agree-tos --no-eff-email
+
 # Habilitamos SSL en Apache
 sudo a2enmod ssl
 sudo a2ensite default-ssl.conf
@@ -282,3 +285,111 @@ sudo a2ensite default-ssl.conf
 sudo systemctl restart apache2
 
 ```
+
+## Personalización de la página y autenticación
+En esta sección terminaremos de personalizar la página web, además, gestionaremos la autenticación.
+
+1. Empezaremos por la personalización, creando las páginas del sitio que necesitamos (status.html y admin.html).
+
+- La página admin.html:
+
+```html
+
+<!-- admin.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración</title>
+</head>
+<body>
+    <h1>Bienvenido a la Administración</h1>
+    <p>Este es un panel privado para administradores.</p>
+    <img src="/logo.png" alt="Logo" style="width: 300px; height: auto;">
+</body>
+</html>
+
+```
+
+- La página status html
+
+```html
+
+<!-- status.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status del Servidor</title>
+</head>
+<body>
+    <h1>Status del Servidor</h1>
+    <p>Información sobre el estado del servidor:</p>
+    <ul>
+        <li>Uptime: 2 días 3 horas</li>
+        <li>Memoria usada: 4GB de 8GB</li>
+        <li>Conexiones activas: 20</li>
+        <li>Uso de CPU: 25%</li>
+    </ul>
+</body>
+</html>
+
+```
+
+- También deberemos tener un archivo **logo.png** en la ruta _/var/www/html/_. Una vez realizado esto deberíamos tener una ruta similar a esta:
+
+```
+
+sitio_web/
+├── index.html
+├── 404.html
+├── apache2.conf
+├── apache2-https.conf 
+├── logo.png 
+├── admin/
+│   └── admin.html
+├── status/
+│   └── status.html
+└── logs/
+
+```
+
+2. Ahora crearemos el archivo **.htpasswd para la autenticación. A este le añadiremos el usuario admin con contraseña asir y el usuario sysadmin con contraseña risa.
+
+```cs
+
+# Creamos el archivo .htpasswd y agregamos los usuarios con las contraseñas
+sudo htpasswd -b -c /etc/apache2/.htpasswd admin asir
+sudo htpasswd -b /etc/apache2/.htpasswd sysadmin risa
+
+```
+
+2. Finalmente tendremos que indicar en el archivo de configuración la autenticación básica. Debería quedar tal que así:
+
+```cs
+
+# Configuración de autenticación básica para /admin
+<Directory /var/www/html/admin/admin.html>
+    AuthType Basic
+    AuthName "Restricted Access"
+    AuthUserFile /etc/apache2/.htpasswd
+    Require valid-user
+</Directory>
+
+# Configuración de autenticación básica para /status
+<Directory /var/www/html/status/status.html>
+    AuthType Basic
+    AuthName "Restricted Access"
+    AuthUserFile /etc/apache2/.htpasswd
+    Require valid-user
+</Directory>
+
+```
+
+## Pruebas
+En esta sección, se pasaríaa a la realización de pruebas, pero debido a que mi router dispone de CG-NAT, no me es posible realizarlas. Ahora, si cualquier persona que siga este readme está interesada, mi recomendación es el uso de **Apache ab**
+
+## Conclusión
+Tras la realización de la práctica he podido descubrir la configuración de una página web mediante apache, la configuración de un servidor DynDNS y su conexión a la plataforma IONOS y por último la redirección de puertos, viendo así que con un sistema CG-NAT es imposible hacerlo. En conclusión, ha sido una práctica muy constructiva y he aprendido bastante.
